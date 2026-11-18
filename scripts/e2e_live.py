@@ -404,6 +404,27 @@ def main() -> int:
         print(re.sub(r"agt_[A-Za-z0-9_-]+", "[redacted]", traceback.format_exc()), flush=True)
     finally:
         # ── 7. cleanup ───────────────────────────────────────────────────────────────
+        # Maps this run published come down through the agent API: unpublish (the
+        # public link must stop working), then delete (it must leave the listing).
+        try:
+            test_maps = [m for m in dock.client._get("/api/agent/maps?take=200").get("maps", [])
+                         if STAMP in (m.get("title") or "")]
+        except Exception as error:  # noqa: BLE001
+            test_maps = []
+            check(public_map is None, f"maps listed for cleanup ({type(error).__name__})")
+        for item in test_maps:
+            link = item.get("publicUrl")
+            try:
+                dock.client._send_json("POST", f"/api/agent/maps/{item['id']}/unpublish", {})
+                if link:
+                    status = anonymous_status(link)
+                    check(status == 404, f"unpublished map link stops working (HTTP {status})")
+                dock.client._send_json("DELETE", f"/api/agent/maps/{item['id']}", {})
+                remaining = {m["id"] for m in dock.client._get("/api/agent/maps?take=200").get("maps", [])}
+                check(item["id"] not in remaining, f"deleted test map {item['id']} is gone from the listing")
+                public_map = None
+            except Exception as error:  # noqa: BLE001 — report, keep going
+                check(False, f"test map {item['id']} cleaned up ({error})")
         leftovers = set(filter(None, (dataset_id, public_id)))
         try:  # also sweep layers a half-finished push may have created
             leftovers |= {d.id for d in dock.client.list_datasets(dock._current_project_id()) if STAMP in (d.name or "")}
