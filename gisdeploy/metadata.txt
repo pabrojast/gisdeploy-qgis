@@ -1,0 +1,24 @@
+[general]
+name=GISDeploy
+qgisMinimumVersion=3.22
+qgisMaximumVersion=4.99
+description=Publish QGIS layers as a web map your clients open from one link, which stays the same when you update the data.
+about=GISDeploy is a hosted web map service (by Aquedra SpA) for consultancies that deliver maps to clients. This plugin uploads vector and raster layers from your QGIS project with their style (SLD), creates a shareable web map that opens in a browser without an account, and lets you push new revisions or roll back to an earlier one while the link and the WMS/WMTS addresses stay the same. You can also load your team's layers back into QGIS as WMS, private ones included. Interface in English and Spanish.
+    Requirements: a GISDeploy account (gisdeploy.com). The free plan includes 1 project, 5 layers and 2 GB; paid plans add capacity. Your layers are uploaded to GISDeploy servers. Layers are private by default; a public map link opens without login. The access token is stored in the QGIS encrypted authentication database.
+version=0.2.0
+author=Aquedra SpA
+email=support@gisdeploy.com
+changelog=0.2.0
+    - QGIS 4 (Qt6) support; QGIS 3.22 or later still supported
+    - Spanish interface
+    - Released under the GNU GPL v2 or later
+    0.1.1
+    - Credentials stored in the QGIS encrypted authentication database
+repository=https://github.com/pabrojast/gisdeploy-qgis
+tracker=https://github.com/pabrojast/gisdeploy-qgis/issues
+homepage=https://gisdeploy.com
+tags=web,webmap,webgis,publishing,cloud,sharing,wms,wmts
+category=Web
+icon=ui/icons/gisdeploy.svg
+experimental=False
+deprecated=False

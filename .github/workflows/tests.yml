@@ -1,0 +1,33 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install pytest
+      - run: python -m pytest -q tests
+      - run: python scripts/update_translations.py --check
+
+  qgis4:
+    # QGIS 4 (Qt6) with the official PyQt5 -> PyQt6 migration checker.
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/qgis/pyqgis4-checker:main-ubuntu
+      options: --user root
+    steps:
+      - uses: actions/checkout@v4
+      - name: Qt6 migration check
+        run: |
+          pyqt5_to_pyqt6.py --dry_run --logfile /tmp/checker.log gisdeploy
+          cat /tmp/checker.log
+          if grep -v -q "=== dry_run mode" /tmp/checker.log; then exit 1; fi
+      - name: Load the plugin in QGIS 4
+        run: QT_QPA_PLATFORM=offscreen python3 scripts/smoke_headless.py
