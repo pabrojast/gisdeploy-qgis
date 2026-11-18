@@ -29,7 +29,15 @@ def wms_uri(wms_url: str, dataset_id: str, authcfg: Optional[str] = None) -> str
     # proxy supplies project-filtered capabilities automatically.
     if not authcfg:
         wms_url += "?" + urlencode({"LAYERS": layer})
+    # Request maps from this endpoint, never from the URLs the capabilities
+    # advertise: those may name the upstream GeoServer, unreachable from QGIS.
+    # The advertised extent is the data's exact bounds; QGIS would crop the map
+    # to it and cut symbols in half at the edges (or draw nothing for a single
+    # point), so the reported extent is not used to clip rendering.
     parts = [
+        "IgnoreGetFeatureInfoUrl=1",
+        "IgnoreGetMapUrl=1",
+        "IgnoreReportedLayerExtents=1",
         "contextualWMSLegend=0",
         "crs=EPSG:3857",
         "dpiMode=7",
@@ -62,7 +70,7 @@ def scrub_legacy_uri(source: str) -> Optional[str]:
         public_url = clean_url(urlunsplit((url.scheme, authority, url.path, "", "")), service=True)
     except ValueError:
         return ""  # unsafe HTTP/credential-bearing source must not remain saved
-    permitted = {"contextualWMSLegend", "crs", "dpiMode", "featureCount", "format", "layers", "styles", "tileMatrixSet", "authcfg"}
+    permitted = {"IgnoreGetFeatureInfoUrl", "IgnoreGetMapUrl", "IgnoreReportedLayerExtents", "contextualWMSLegend", "crs", "dpiMode", "featureCount", "format", "layers", "styles", "tileMatrixSet", "authcfg"}
     clean = {key: val for key, val in pairs.items() if key in permitted and "agt_" not in val.lower()}
     if "authcfg" in clean and not re.fullmatch(r"[A-Za-z0-9]{7}", clean["authcfg"]):
         clean.pop("authcfg")

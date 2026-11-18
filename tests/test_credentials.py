@@ -86,6 +86,22 @@ def test_provider_uri_never_accepts_a_raw_token_or_credential_bearing_endpoint()
     assert "LAYERS%3Dds_layer_one" in anonymous
 
 
+def test_maps_are_requested_from_the_given_endpoint_not_advertised_urls():
+    # Full-access capabilities can advertise the internal GeoServer address.
+    for uri in (wms_uri("https://ogc.test/ogc/own/wms", "layer-one", "abc1234"), wms_uri("https://ogc.test/ogc/own/wms", "layer-one")):
+        assert "IgnoreGetMapUrl=1" in uri.split("&") and "IgnoreGetFeatureInfoUrl=1" in uri.split("&")
+    kept = scrub_legacy_uri("IgnoreGetMapUrl=1&layers=ds_layer&url=https%3A%2F%2Fogc.test%2Fogc%2Fown%2Fwms&password=x")
+    assert "IgnoreGetMapUrl=1" in kept and "password" not in kept
+
+
+def test_symbols_are_not_cropped_to_the_reported_layer_extent():
+    # The advertised extent is the data's exact bounds: cropping to it cuts edge symbols in half.
+    for uri in (wms_uri("https://ogc.test/ogc/own/wms", "layer-one", "abc1234"), wms_uri("https://ogc.test/ogc/own/wms", "layer-one")):
+        assert "IgnoreReportedLayerExtents=1" in uri.split("&")
+    kept = scrub_legacy_uri("IgnoreReportedLayerExtents=1&layers=ds_layer&url=https%3A%2F%2Fogc.test%2Fogc%2Fown%2Fwms")
+    assert "IgnoreReportedLayerExtents=1" in kept
+
+
 def test_legacy_project_sources_are_scrubbed_without_copying_the_old_token():
     source = f"layers=ds_layer&url=https%3A%2F%2Fogc.test%2Fogc%2Fown%2Fwms&username=token&password={TOKEN}"
     cleaned = scrub_legacy_uri(source)
@@ -108,6 +124,22 @@ def test_response_errors_and_transport_diagnostics_never_expose_token_or_basic_h
         assert TOKEN not in str(error.value)
         assert error.value.__suppress_context__
     assert TOKEN not in safe_message(f"task failed with {TOKEN}")
+
+
+def test_transport_identifies_the_plugin_instead_of_python_urllib():
+    # Cloudflare in front of gisdeploy.com answers 403 (error 1010) to "Python-urllib/3.x".
+    import configparser
+    from gisdeploy.core.transport import USER_AGENT
+    parser = configparser.ConfigParser(interpolation=None)
+    parser.read(os.path.join(os.path.dirname(__file__), "..", "gisdeploy", "metadata.txt"), encoding="utf-8")
+    assert USER_AGENT.startswith(f"GISDeploy-QGIS/{parser['general']['version']} ")
+    with patch("urllib.request.build_opener") as opener:
+        opener.return_value.open.return_value.__enter__.return_value.status = 200
+        UrllibTransport().request("GET", "https://gisdeploy.test", headers={"Authorization": "Bearer x"})
+        sent = opener.return_value.open.call_args[0][0]
+    assert sent.get_header("User-agent") == USER_AGENT
+    assert "Python-urllib" not in sent.get_header("User-agent")
+    assert sent.get_header("Authorization") == "Bearer x"
 
 
 def test_api_bearer_is_only_a_header_and_redirects_never_forward_it():

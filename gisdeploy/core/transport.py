@@ -8,7 +8,9 @@ it everywhere and no third-party dependency is needed.
 
 from __future__ import annotations
 
+import configparser
 import json
+import os
 import ssl
 import urllib.error
 import urllib.request
@@ -53,12 +55,30 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+def _plugin_version() -> str:
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "metadata.txt")
+    parser = configparser.ConfigParser(interpolation=None)
+    try:
+        with open(path, encoding="utf-8") as handle:
+            parser.read_file(handle)
+    except (OSError, configparser.Error):
+        return "dev"
+    return parser.get("general", "version", fallback="dev").strip() or "dev"
+
+
+# gisdeploy.com sits behind Cloudflare, whose browser integrity check rejects
+# urllib's default "Python-urllib/3.x" signature with 403 (error code 1010).
+USER_AGENT = f"GISDeploy-QGIS/{_plugin_version()} (+https://gisdeploy.com)"
+
+
 class UrllibTransport(Transport):
-    def __init__(self, verify_tls: bool = True):
+    def __init__(self, verify_tls: bool = True, user_agent: str = USER_AGENT):
         self._context = None if verify_tls else ssl._create_unverified_context()
+        self._user_agent = user_agent
 
     def request(self, method, url, headers=None, body=None, timeout=60.0):
         request = urllib.request.Request(url, data=body, method=method.upper())
+        request.add_header("User-Agent", self._user_agent)
         for key, value in (headers or {}).items():
             request.add_header(key, value)
         try:

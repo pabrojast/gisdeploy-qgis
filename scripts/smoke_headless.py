@@ -19,8 +19,11 @@ import zipfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))  # the folder that contains gisdeploy/
 
+import time  # noqa: E402
+
 from qgis.core import (  # noqa: E402
     Qgis,
+    QgsApplication,
     QgsFeature,
     QgsGeometry,
     QgsPointXY,
@@ -100,6 +103,8 @@ def main() -> int:
     from gisdeploy.core.sync_state import SyncState
     from gisdeploy.qgis_io.exporter import export_layer, project_layers
     from gisdeploy.qgis_io.layer_state import layer_sync_state
+    from gisdeploy.qgis_io.tasks import start_task
+    from gisdeploy.ui.labels import status_label
     from gisdeploy.ui.commit_dialog import CommitDialog
     from gisdeploy.ui.connect_dialog import ConnectDialog
     from gisdeploy.ui.history_dialog import HistoryDialog
@@ -120,6 +125,8 @@ def main() -> int:
           "dock opens from the toolbar action")
     check(dock.tabs.tabText(1) == "En GISDeploy", "dock tabs are translated")
     check(dock.connection_label.text() == "Sin conexión", "connection label is translated")
+    check([status_label(s) for s in ("READY", "ACTIVE", "SUPERSEDED")] == ["Lista", "Activa", "Reemplazada"],
+          "server statuses are translated")
     states = [dock.local_tree.topLevelItem(i).text(1) for i in range(dock.local_tree.topLevelItemCount())]
     check(states == ["● sin subir", "● sin subir"], f"local layers listed as untracked: {states}")
 
@@ -134,6 +141,17 @@ def main() -> int:
     check(connect.windowTitle() == "Conectar con GISDeploy", "connect dialog is translated")
     history = HistoryDialog(FakeClient(), FakeDataset(), dock)
     check(history.windowTitle() == "Historial — fixture", "history dialog is translated")
+
+    # Push, refresh and publish all run through start_task; the caller drops the
+    # returned task, which must still run and report back.
+    delivered = []
+    start_task("smoke", lambda report: "worked", lambda result, error: delivered.append((result, error)))
+    deadline = time.monotonic() + 20
+    while not delivered and time.monotonic() < deadline:
+        app.processEvents()
+        time.sleep(0.05)
+    check(delivered == [("worked", None)] and QgsApplication.taskManager().countActiveTasks() == 0,
+          f"background task runs without a caller reference: {delivered}")
 
     zip_path, vector_hash = export_layer(points, workdir)
     with zipfile.ZipFile(zip_path) as archive:

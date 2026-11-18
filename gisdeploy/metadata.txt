@@ -12,6 +12,12 @@ changelog=0.2.0
     - QGIS 4 (Qt6) support; QGIS 3.22 or later still supported
     - Spanish interface
     - Released under the GNU GPL v2 or later
+    - Fixed: connecting to gisdeploy.com was refused by its CDN
+    - Fixed: Push, Refresh and Publish map could silently never run
+    - Fixed: pushing a new version now waits until it is live and reports processing errors
+    - Fixed: layer styles exported by QGIS were rejected by the server
+    - Fixed: private layers added with Add to QGIS stayed blank
+    - Fixed: symbols at the edge of a layer added with Add to QGIS were cut in half
     0.1.1
     - Credentials stored in the QGIS encrypted authentication database
 repository=https://github.com/pabrojast/gisdeploy-qgis

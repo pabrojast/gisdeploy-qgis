@@ -114,6 +114,9 @@ python3 scripts/update_translations.py --check                    # .ts current 
 QT_QPA_PLATFORM=offscreen python3 scripts/smoke_headless.py       # loads the plugin in QGIS
 ```
 
+`scripts/e2e_live.py` runs the whole flow against a live GISDeploy server with
+a test token; see its docstring.
+
 `smoke_headless.py` needs the QGIS Python bindings. To check QGIS 4 (Qt6)
 compatibility, run it, and the official migration checker, inside the
 `ghcr.io/qgis/pyqgis4-checker:main-ubuntu` image (QGIS 4 with Qt6):

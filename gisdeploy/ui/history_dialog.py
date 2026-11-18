@@ -17,6 +17,7 @@ from qgis.PyQt.QtWidgets import (
 
 from ..core.api_client import ApiError, TransportError
 from ..translation import error_text
+from .labels import status_label
 
 
 class HistoryDialog(QDialog):
@@ -62,7 +63,7 @@ class HistoryDialog(QDialog):
             self.status_label.setText(error_text(error))
             return
         for revision in history["revisions"]:
-            status = revision.status
+            status = status_label(revision.status)
             if revision.number == history.get("head"):
                 status = self.tr("{0} (head)").format(status)
             item = QTreeWidgetItem(

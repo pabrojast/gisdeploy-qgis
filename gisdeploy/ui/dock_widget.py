@@ -25,15 +25,16 @@ from qgis.PyQt.QtWidgets import (
 from ..core.api_client import ApiError, GisDeployClient, TransportError
 from ..qgis_io import layer_state
 from ..qgis_io.exporter import ExportError, export_layer, project_layers
-from ..qgis_io.tasks import poll_until_ready, start_task
+from ..qgis_io.tasks import poll_revision, poll_until_ready, start_task
 from ..qgis_io.wms import scrub_legacy_uri, wms_uri
 from ..qgis_io.auth import AuthenticationError, connection_token
 from ..core.security import clean_url, safe_message
+from ..core.sld import strip_schema_locations
 from ..translation import error_text
 from .commit_dialog import CommitDialog
 from .connect_dialog import ConnectDialog, saved_connection
 from .history_dialog import HistoryDialog
-from .labels import state_label, visibility_label
+from .labels import state_label, status_label, visibility_label
 
 
 class GisDeployDock(QDockWidget):
@@ -266,6 +267,7 @@ class GisDeployDock(QDockWidget):
                     )
                     dataset_id = outcome.get("datasetId", job["dataset_id"])
                     unchanged = outcome.get("status") == "unchanged"
+                    revision_number = (outcome.get("revision") or {}).get("number")
                 else:
                     outcome = client.upload_file(
                         job["upload_path"],
@@ -276,16 +278,20 @@ class GisDeployDock(QDockWidget):
                     )
                     dataset_id = outcome["datasetId"]
                     unchanged = False
+                    revision_number = None
 
                 if not unchanged:
                     job_report(0.5, self.tr("Processing {0}…").format(job["layer_name"]))
-                    poll_until_ready(client, dataset_id, job_report, base_fraction=0.5)
+                    if revision_number:
+                        poll_revision(client, dataset_id, int(revision_number), job_report, base_fraction=0.5)
+                    else:
+                        poll_until_ready(client, dataset_id, job_report, base_fraction=0.5)
 
                 sld_error = None
                 if job["sld_path"]:
                     try:
                         with open(job["sld_path"], "r", encoding="utf-8") as handle:
-                            client.apply_sld(dataset_id, handle.read())
+                            client.apply_sld(dataset_id, strip_schema_locations(handle.read()))
                     except (ApiError, TransportError, OSError) as error:
                         sld_error = str(error)
 
@@ -362,7 +368,7 @@ class GisDeployDock(QDockWidget):
                     if head.message:
                         last_commit += f" {head.message}"
                 item = QTreeWidgetItem(
-                    [dataset.name, dataset.status, visibility_label(dataset.visibility), last_commit]
+                    [dataset.name, status_label(dataset.status), visibility_label(dataset.visibility), last_commit]
                 )
                 item.setData(0, Qt.ItemDataRole.UserRole, dataset.id)
                 self.remote_tree.addTopLevelItem(item)

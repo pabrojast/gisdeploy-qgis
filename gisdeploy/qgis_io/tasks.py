@@ -18,6 +18,11 @@ from ..translation import tr
 POLL_INTERVAL_SECONDS = 4.0  # the manifest's recommended dataset.status cadence
 POLL_TIMEOUT_SECONDS = 600.0
 
+# The task manager does not keep the Python side of a QgsTask subclass alive: a
+# task nobody references is garbage-collected and silently never runs. Running
+# tasks are held here until their `finished` callback has been delivered.
+_ACTIVE_TASKS = set()
+
 
 class WorkerTask(QgsTask):
     """Run `work(report)` off the UI thread, then `on_done(result, error)` on it."""
@@ -43,31 +48,65 @@ class WorkerTask(QgsTask):
             return False
 
     def finished(self, ok):  # noqa: D102 — QgsTask API (main thread)
-        self._on_done(self._result if ok else None, self._error)
+        try:
+            self._on_done(self._result if ok else None, self._error)
+        finally:
+            _ACTIVE_TASKS.discard(self)
 
 
 def start_task(description: str, work: Callable, on_done: Callable) -> WorkerTask:
     task = WorkerTask(description, work, on_done)
-    QgsApplication.taskManager().addTask(task)
+    _ACTIVE_TASKS.add(task)
+    if not QgsApplication.taskManager().addTask(task):
+        _ACTIVE_TASKS.discard(task)
+        raise RuntimeError("Could not start the background task.")
     return task
 
 
-def poll_until_ready(client, dataset_id: str, report, base_fraction: float = 0.6):
-    """Poll dataset.status until READY/FAILED, mapping time onto the tail of the bar."""
+def _poll(probe, report, base_fraction: float):
+    """Call `probe()` → (done, result, stage) until done, mapping time onto the bar's tail."""
     started = time.monotonic()
     while True:
-        status = client.dataset_status(dataset_id)
-        if status.status == "READY":
+        done, result, stage = probe()
+        if done:
             report(1.0, "")
-            return status
-        if status.status == "FAILED":
-            raise RuntimeError(status.error_message or "Processing failed on the server.")
+            return result
         elapsed = time.monotonic() - started
         if elapsed > POLL_TIMEOUT_SECONDS:
             raise RuntimeError("Timed out waiting for the server to process the dataset.")
         share = min(elapsed / 120.0, 0.95)
-        report(
-            base_fraction + (1.0 - base_fraction) * share,
-            tr("Processing ({0})…").format(status.stage or status.status),
-        )
+        report(base_fraction + (1.0 - base_fraction) * share, tr("Processing ({0})…").format(stage))
         time.sleep(POLL_INTERVAL_SECONDS)
+
+
+def poll_until_ready(client, dataset_id: str, report, base_fraction: float = 0.6):
+    """Poll a NEW dataset's status until READY or FAILED."""
+
+    def probe():
+        status = client.dataset_status(dataset_id)
+        if status.status == "FAILED":
+            raise RuntimeError(status.error_message or "Processing failed on the server.")
+        return status.status == "READY", status, status.stage or status.status
+
+    return _poll(probe, report, base_fraction)
+
+
+def poll_revision(client, dataset_id: str, number: int, report, base_fraction: float = 0.6):
+    """Poll a pushed revision until it serves (ACTIVE, or already SUPERSEDED) or FAILED.
+
+    dataset.status cannot tell: the dataset stays READY while a new revision is
+    processed, because the previous revision keeps serving (and is restored if
+    the new one fails).
+    """
+
+    def probe():
+        history = client.list_revisions(dataset_id)
+        revision = next((r for r in history["revisions"] if r.number == number), None)
+        state = revision.status if revision else "UPLOADED"
+        if state == "FAILED":
+            raise RuntimeError(
+                revision.error_message or "The new revision failed processing; the previous revision keeps serving."
+            )
+        return state in ("ACTIVE", "SUPERSEDED"), revision, state
+
+    return _poll(probe, report, base_fraction)

@@ -122,8 +122,8 @@
             <translation>Solo se pueden subir capas vectoriales y ráster.</translation>
         </message>
         <message>
-            <source>Processing failed on the server.</source>
-            <translation>El procesamiento falló en el servidor.</translation>
+            <source>Could not start the background task.</source>
+            <translation>No se pudo iniciar la tarea en segundo plano.</translation>
         </message>
         <message>
             <source>Timed out waiting for the server to process the dataset.</source>
@@ -132,6 +132,14 @@
         <message>
             <source>Processing ({0})…</source>
             <translation>Procesando ({0})…</translation>
+        </message>
+        <message>
+            <source>Processing failed on the server.</source>
+            <translation>El procesamiento falló en el servidor.</translation>
+        </message>
+        <message>
+            <source>The new revision failed processing; the previous revision keeps serving.</source>
+            <translation>La nueva versión no se pudo procesar; la versión anterior sigue publicada.</translation>
         </message>
         <message>
             <source>A QGIS authentication configuration ID is required.</source>
@@ -152,6 +160,30 @@
         <message>
             <source>? unknown</source>
             <translation>? desconocido</translation>
+        </message>
+        <message>
+            <source>Uploaded</source>
+            <translation>Subida</translation>
+        </message>
+        <message>
+            <source>Processing</source>
+            <translation>Procesando</translation>
+        </message>
+        <message>
+            <source>Ready</source>
+            <translation>Lista</translation>
+        </message>
+        <message>
+            <source>Failed</source>
+            <translation>Con error</translation>
+        </message>
+        <message>
+            <source>Active</source>
+            <translation>Activa</translation>
+        </message>
+        <message>
+            <source>Superseded</source>
+            <translation>Reemplazada</translation>
         </message>
         <message>
             <source>Private</source>
